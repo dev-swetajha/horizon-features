@@ -1,0 +1,581 @@
+{% comment %}
+  Animated Product Grid Block with GSAP and static animated icons
+{% endcomment %}
+
+{% assign ai_gen_id = block.id | replace: '_', '' | replace: '-', '' | downcase %}
+
+{% style %}
+  .ai-animated-grid-{{ ai_gen_id }} {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax({{ block.settings.card_min_width }}px, 1fr));
+    gap: {{ block.settings.grid_gap }}px;
+    padding: {{ block.settings.section_padding }}px;
+    max-width: {{ block.settings.max_width }}px;
+    margin: 0 auto;
+  }
+
+  .ai-animated-card-{{ ai_gen_id }} {
+    background-color: {{ block.settings.card_background }};
+    border-radius: {{ block.settings.card_border_radius }}px;
+    padding: {{ block.settings.card_padding }}px;
+    text-align: center;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    opacity: 0;
+    transform: translateY(30px);
+    border: {{ block.settings.card_border_width }}px solid {{ block.settings.card_border_color }};
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ai-animated-card-{{ ai_gen_id }}:hover {
+    transform: translateY(-{{ block.settings.hover_lift }}px);
+    box-shadow: 0 {{ block.settings.hover_shadow }}px {{ block.settings.hover_shadow | times: 2 }}px rgba(0, 0, 0, 0.15);
+  }
+
+  .ai-animated-card-image-{{ ai_gen_id }} {
+    width: {{ block.settings.image_size }}px;
+    height: {{ block.settings.image_size }}px;
+    margin: 0 auto {{ block.settings.image_margin }}px;
+    display: block;
+    object-fit: contain;
+  }
+
+  .ai-animated-card-text-{{ ai_gen_id }} {
+    color: {{ block.settings.text_color }};
+    font-size: {{ block.settings.text_size }}px;
+    margin: 0;
+    font-weight: {{ block.settings.text_weight }};
+  }
+
+  .ai-tech-card-{{ ai_gen_id }} {
+    background-color: {{ block.settings.tech_card_background }};
+    color: {{ block.settings.tech_card_text_color }};
+  }
+
+  .ai-tech-title-{{ ai_gen_id }} {
+    font-size: {{ block.settings.tech_title_size }}px;
+    font-weight: {{ block.settings.tech_title_weight }};
+    margin: 0 0 {{ block.settings.tech_title_margin }}px 0;
+    color: {{ block.settings.tech_card_text_color }};
+  }
+
+  @media screen and (max-width: 768px) {
+    .ai-animated-grid-{{ ai_gen_id }} {
+      grid-template-columns: repeat({{ block.settings.mobile_columns }}, 1fr);
+      gap: {{ block.settings.mobile_gap }}px;
+      padding: {{ block.settings.mobile_padding }}px;
+    }
+
+    .ai-animated-card-image-{{ ai_gen_id }} {
+      width: {{ block.settings.mobile_image_size }}px;
+      height: {{ block.settings.mobile_image_size }}px;
+    }
+  }
+{% endstyle %}
+
+<animated-grid-{{ ai_gen_id }} class="ai-animated-grid-{{ ai_gen_id }} loading" {{ block.shopify_attributes }}>
+  {% for i in (1..4) %}
+    {% liquid
+      case i
+        when 1
+          assign card_text = block.settings.card_1_text
+          assign card_link = block.settings.card_1_link
+          assign card_icon = 'booklight-icon.svg'
+        when 2
+          assign card_text = block.settings.card_2_text
+          assign card_link = block.settings.card_2_link
+          assign card_icon = 'booklight-icon.svg'
+        when 3
+          assign card_text = block.settings.card_3_text
+          assign card_link = block.settings.card_3_link
+          assign card_icon = 'booklight-icon.svg'
+        when 4
+          assign card_text = block.settings.card_4_text
+          assign card_link = block.settings.card_4_link
+      endcase
+    %}
+
+    <div class="ai-animated-card-{{ ai_gen_id }} {% if i == 4 %}ai-tech-card-{{ ai_gen_id }}{% endif %}" 
+         data-card="{{ i }}" 
+         data-link="{% if card_link %}{{ card_link }}{% endif %}">
+      {% if i == 4 %}
+        <p class="ai-tech-title-{{ ai_gen_id }}">{{ block.settings.tech_title }}</p>
+        <p class="ai-animated-card-text-{{ ai_gen_id }}">{{ card_text }}</p>
+      {% else %}
+        <img
+          src="{{ card_icon | asset_url }}"
+          alt="Animated Icon"
+          class="ai-animated-card-image-{{ ai_gen_id }}"
+          loading="lazy"
+          width="{{ block.settings.image_size }}"
+          height="{{ block.settings.image_size }}"
+        >
+        <p class="ai-animated-card-text-{{ ai_gen_id }}">{{ card_text }}</p>
+      {% endif %}
+    </div>
+  {% endfor %}
+</animated-grid-{{ ai_gen_id }}>
+
+<script>
+  (function() {
+    function waitForGSAP(callback) {
+      if (typeof gsap !== 'undefined') {
+        callback();
+      } else {
+        setTimeout(() => waitForGSAP(callback), 100);
+      }
+    }
+
+    class AnimatedGrid{{ ai_gen_id }} extends HTMLElement {
+      constructor() {
+        super();
+        this.hasAnimated = false;
+      }
+
+      connectedCallback() {
+        waitForGSAP(() => {
+          this.init();
+        });
+      }
+
+      init() {
+        this.setupCardClicks();
+        this.setupIntersectionObserver();
+        this.classList.remove('loading');
+
+        const rect = this.getBoundingClientRect();
+        if (rect.top < window.innerHeight && rect.bottom > 0) {
+          this.animateCards();
+        }
+      }
+
+      setupIntersectionObserver() {
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting && !this.hasAnimated) {
+              this.animateCards();
+              observer.unobserve(entry.target);
+            }
+          });
+        }, {
+          threshold: 0.2,
+          rootMargin: '0px 0px -50px 0px'
+        });
+
+        observer.observe(this);
+      }
+
+      setupCardClicks() {
+        const cards = this.querySelectorAll('.ai-animated-card-{{ ai_gen_id }}');
+        
+        cards.forEach((card) => {
+          card.addEventListener('click', (e) => {
+            e.preventDefault();
+            const link = card.dataset.link;
+            if (link && link.trim() !== '') {
+              gsap.to(card, {
+                scale: 0.95,
+                duration: 0.1,
+                yoyo: true,
+                repeat: 1,
+                ease: 'power2.inOut',
+                onComplete: () => {
+                  window.location.href = link;
+                }
+              });
+            }
+          });
+
+          card.addEventListener('mouseenter', () => {
+            gsap.to(card, {
+              scale: 1.02,
+              duration: 0.3,
+              ease: 'power2.out'
+            });
+          });
+
+          card.addEventListener('mouseleave', () => {
+            gsap.to(card, {
+              scale: 1,
+              duration: 0.3,
+              ease: 'power2.out'
+            });
+          });
+        });
+      }
+
+      animateCards() {
+        if (this.hasAnimated) return;
+        this.hasAnimated = true;
+
+        const cards = this.querySelectorAll('.ai-animated-card-{{ ai_gen_id }}');
+        const images = this.querySelectorAll('.ai-animated-card-image-{{ ai_gen_id }}');
+
+        gsap.timeline()
+          .set(cards, { opacity: 0, y: 50, scale: 0.8 })
+          .to(cards, {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            duration: 0.8,
+            stagger: { amount: 0.6, from: 'start' },
+            ease: 'back.out(1.2)'
+          })
+          .to(images, {
+            rotation: 360,
+            duration: 1,
+            stagger: 0.1,
+            ease: 'power2.inOut'
+          }, '-=0.4');
+
+        images.forEach((img, index) => {
+          gsap.to(img, {
+            y: -8,
+            duration: 2 + (index * 0.2),
+            repeat: -1,
+            yoyo: true,
+            ease: 'sine.inOut',
+            delay: index * 0.3
+          });
+        });
+
+        const techCard = this.querySelector('.ai-tech-card-{{ ai_gen_id }}');
+        if (techCard) {
+          gsap.to(techCard, {
+            boxShadow: '0 0 20px rgba(255, 255, 255, 0.3)',
+            duration: 2,
+            repeat: -1,
+            yoyo: true,
+            ease: 'sine.inOut'
+          });
+        }
+      }
+    }
+
+    if (!customElements.get('animated-grid-{{ ai_gen_id }}')) {
+      customElements.define('animated-grid-{{ ai_gen_id }}', AnimatedGrid{{ ai_gen_id }});
+    }
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Animated Product Grid",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "range",
+      "id": "card_min_width",
+      "min": 150,
+      "max": 300,
+      "step": 10,
+      "unit": "px",
+      "label": "Card minimum width",
+      "default": 200
+    },
+    {
+      "type": "range",
+      "id": "grid_gap",
+      "min": 10,
+      "max": 50,
+      "step": 5,
+      "unit": "px",
+      "label": "Grid gap",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "section_padding",
+      "min": 0,
+      "max": 100,
+      "step": 10,
+      "unit": "px",
+      "label": "Section padding",
+      "default": 40
+    },
+    {
+      "type": "range",
+      "id": "max_width",
+      "min": 800,
+      "max": 1400,
+      "step": 50,
+      "unit": "px",
+      "label": "Maximum width",
+      "default": 1200
+    },
+    {
+      "type": "select",
+      "id": "mobile_columns",
+      "label": "Mobile columns",
+      "options": [
+        {"value": "1", "label": "1"},
+        {"value": "2", "label": "2"}
+      ],
+      "default": "2"
+    },
+    {
+      "type": "range",
+      "id": "mobile_gap",
+      "min": 5,
+      "max": 30,
+      "step": 5,
+      "unit": "px",
+      "label": "Mobile gap",
+      "default": 15
+    },
+    {
+      "type": "range",
+      "id": "mobile_padding",
+      "min": 10,
+      "max": 50,
+      "step": 10,
+      "unit": "px",
+      "label": "Mobile padding",
+      "default": 20
+    },
+    {
+      "type": "header",
+      "content": "Card Style"
+    },
+    {
+      "type": "color",
+      "id": "card_background",
+      "label": "Card background",
+      "default": "#ffffff"
+    },
+    {
+      "type": "range",
+      "id": "card_border_radius",
+      "min": 0,
+      "max": 30,
+      "step": 2,
+      "unit": "px",
+      "label": "Card border radius",
+      "default": 12
+    },
+    {
+      "type": "range",
+      "id": "card_padding",
+      "min": 10,
+      "max": 50,
+      "step": 5,
+      "unit": "px",
+      "label": "Card padding",
+      "default": 25
+    },
+    {
+      "type": "range",
+      "id": "card_border_width",
+      "min": 0,
+      "max": 5,
+      "step": 1,
+      "unit": "px",
+      "label": "Card border width",
+      "default": 1
+    },
+    {
+      "type": "color",
+      "id": "card_border_color",
+      "label": "Card border color",
+      "default": "#e6e6e6"
+    },
+    {
+      "type": "range",
+      "id": "hover_lift",
+      "min": 0,
+      "max": 20,
+      "step": 2,
+      "unit": "px",
+      "label": "Hover lift effect",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "hover_shadow",
+      "min": 0,
+      "max": 30,
+      "step": 2,
+      "unit": "px",
+      "label": "Hover shadow",
+      "default": 10
+    },
+    {
+      "type": "header",
+      "content": "Images"
+    },
+    {
+      "type": "range",
+      "id": "image_size",
+      "min": 40,
+      "max": 120,
+      "step": 10,
+      "unit": "px",
+      "label": "Image size",
+      "default": 80
+    },
+    {
+      "type": "range",
+      "id": "image_margin",
+      "min": 0,
+      "max": 30,
+      "step": 5,
+      "unit": "px",
+      "label": "Image bottom margin",
+      "default": 15
+    },
+    {
+      "type": "range",
+      "id": "mobile_image_size",
+      "min": 30,
+      "max": 80,
+      "step": 5,
+      "unit": "px",
+      "label": "Mobile image size",
+      "default": 60
+    },
+    {
+      "type": "header",
+      "content": "Text Style"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text color",
+      "default": "#000000"
+    },
+    {
+      "type": "range",
+      "id": "text_size",
+      "min": 12,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "label": "Text size",
+      "default": 16
+    },
+    {
+      "type": "select",
+      "id": "text_weight",
+      "label": "Text weight",
+      "options": [
+        {"value": "400", "label": "Normal"},
+        {"value": "500", "label": "Medium"},
+        {"value": "600", "label": "Semi Bold"},
+        {"value": "700", "label": "Bold"}
+      ],
+      "default": "500"
+    },
+    {
+      "type": "header",
+      "content": "Tech Card Style"
+    },
+    {
+      "type": "color",
+      "id": "tech_card_background",
+      "label": "Tech card background",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "tech_card_text_color",
+      "label": "Tech card text color",
+      "default": "#ffffff"
+    },
+    {
+      "type": "text",
+      "id": "tech_title",
+      "label": "Tech card title",
+      "default": "Tech"
+    },
+    {
+      "type": "range",
+      "id": "tech_title_size",
+      "min": 16,
+      "max": 32,
+      "step": 2,
+      "unit": "px",
+      "label": "Tech title size",
+      "default": 24
+    },
+    {
+      "type": "select",
+      "id": "tech_title_weight",
+      "label": "Tech title weight",
+      "options": [
+        {"value": "400", "label": "Normal"},
+        {"value": "500", "label": "Medium"},
+        {"value": "600", "label": "Semi Bold"},
+        {"value": "700", "label": "Bold"}
+      ],
+      "default": "700"
+    },
+    {
+      "type": "range",
+      "id": "tech_title_margin",
+      "min": 0,
+      "max": 25,
+      "step": 5,
+      "unit": "px",
+      "label": "Tech title bottom margin",
+      "default": 10
+    },
+    {
+      "type": "header",
+      "content": "Card Text + Links"
+    },
+    {
+      "type": "text",
+      "id": "card_1_text",
+      "label": "Card 1 text",
+      "default": "Shop Booklights"
+    },
+    {
+      "type": "url",
+      "id": "card_1_link",
+      "label": "Card 1 link"
+    },
+    {
+      "type": "text",
+      "id": "card_2_text",
+      "label": "Card 2 text",
+      "default": "Shop Bookholders"
+    },
+    {
+      "type": "url",
+      "id": "card_2_link",
+      "label": "Card 2 link"
+    },
+    {
+      "type": "text",
+      "id": "card_3_text",
+      "label": "Card 3 text",
+      "default": "Shop Stationery"
+    },
+    {
+      "type": "url",
+      "id": "card_3_link",
+      "label": "Card 3 link"
+    },
+    {
+      "type": "text",
+      "id": "card_4_text",
+      "label": "Card 4 text",
+      "default": "Shop Gift Tech"
+    },
+    {
+      "type": "url",
+      "id": "card_4_link",
+      "label": "Card 4 link"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Animated Product Grid"
+    }
+  ]
+}
+{% endschema %}
