@@ -1,0 +1,38 @@
+<sku-display class="product-sku spacing-style" {{ block.shopify_attributes }} data-product-id="{{ product.id }}" style="{% render 'spacing-style', settings: block.settings %}">
+  <span class="product-sku-label">SKU:</span>
+  <span class="product-sku-value">
+    {% if product.selected_or_first_available_variant.sku != blank %}
+      {{ product.selected_or_first_available_variant.sku }}
+    {% else %}
+      Not available
+    {% endif %}
+  </span>
+</sku-display>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const skuDisplay = document.querySelector('.product-sku[data-product-id="{{ product.id }}"]');
+  if (!skuDisplay) return;
+  
+  const skuValue = skuDisplay.querySelector('.product-sku-value');
+  
+  document.addEventListener('variant:update', function(event) {
+    if (event.detail.data.productId === '{{ product.id }}') {
+      const variant = event.detail.resource;
+      
+      if (variant.sku && variant.sku.trim() !== '') {
+        skuValue.textContent = variant.sku;
+      } else {
+        skuValue.textContent = 'Not available';
+      }
+    }
+  });
+});
+</script>
+
+{% schema %}
+{
+  "name": "SKU Display",
+  "settings": []
+}
+{% endschema %}
